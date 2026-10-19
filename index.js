@@ -54,7 +54,7 @@ function loadIdentity() {
     uuid: process.env.UUID || old.uuid || crypto.randomUUID(),
     wsPath: normalizePath(process.env.WSPATH || old.wsPath || '/ws-' + randomToken(9)),
     subToken: process.env.SUB_TOKEN || old.subToken || randomToken(24),
-    nodeId: process.env.NODE_ID || old.nodeId || 'rustix-01'
+    nodeId: process.env.NODE_ID || old.nodeId || 'rustix-01-native'
   };
 
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identity.uuid)) {
@@ -97,7 +97,7 @@ let registryToken = readRegistryToken();
 
 let countryCode = '';
 let egressIp = '';
-let nodeName = String(process.env.NODE_NAME || 'Rustix-01').trim();
+let nodeName = String(process.env.NODE_NAME || 'Rustix-01-Native').trim();
 
 const subPath = '/' + identity.subToken + '/sub';
 const sub64Path = '/' + identity.subToken + '/sub64';
@@ -109,7 +109,7 @@ function hostForUri(host) {
 }
 
 function refreshNodeName() {
-  const base = String(process.env.NODE_NAME || 'Rustix-01').trim().replace(/^[A-Z]{2}-/i, '');
+  const base = String(process.env.NODE_NAME || 'Rustix-01-Native').trim().replace(/^[A-Z]{2}-/i, '');
   nodeName = countryCode ? countryCode + '-' + base : base;
 }
 
