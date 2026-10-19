@@ -5,6 +5,7 @@ const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const dns = require('dns').promises;
 
 const HOME = process.env.HOME || '/home/container';
 const STATE_DIR = path.resolve(process.env.STATE_DIR || path.join(HOME, '.rustix-node'));
@@ -535,6 +536,7 @@ server.on('upgrade', (req, socket, head) => {
   try { pathname = new URL(req.url, 'http://localhost').pathname; } catch {}
 
   const key = req.headers['sec-websocket-key'];
+  console.log('WS_UPGRADE_SEEN host=' + String(req.headers.host || '') + ' path_match=' + (pathname === identity.wsPath ? 'yes' : 'no'));
   if (
     pathname !== identity.wsPath ||
     !key ||
@@ -549,6 +551,7 @@ server.on('upgrade', (req, socket, head) => {
     .update(String(key) + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11')
     .digest('base64');
 
+  console.log('WS_UPGRADE_ACCEPTED');
   socket.write(
     'HTTP/1.1 101 Switching Protocols\r\n' +
     'Upgrade: websocket\r\n' +
@@ -573,16 +576,19 @@ server.on('upgrade', (req, socket, head) => {
       return peer.close(1008);
     }
 
+    console.log('VLESS_REQUEST_ACCEPTED target_port=' + info.port + ' target_family=' + (net.isIP(info.host) || 'domain'));
     remote = net.connect({ host: info.host, port: info.port });
 
-    const fail = () => {
+    const fail = (err) => {
+      console.log('VLESS_OUTBOUND_FAIL reason=' + String(err?.code || err?.message || 'unknown'));
       try { if (remote) remote.destroy(); } catch {}
       peer.close(1011);
     };
 
-    remote.setTimeout(60000, fail);
+    remote.setTimeout(60000, () => fail(new Error('timeout')));
     remote.once('connect', () => {
       established = true;
+      console.log('VLESS_OUTBOUND_READY');
       remote.setTimeout(0);
       peer.binary(Buffer.from([info.version, 0]));
       if (info.payload.length) remote.write(info.payload);
@@ -598,6 +604,52 @@ server.on('upgrade', (req, socket, head) => {
   };
 });
 
+async function runStartupDiagnostics() {
+  console.log('DIAG_ENV SERVER_PORT=' + String(process.env.SERVER_PORT || '') + ' PORT=' + String(process.env.PORT || '') + ' listen=' + listenHost + ':' + listenPort);
+
+  try {
+    const local = await new Promise((resolve, reject) => {
+      const req = http.get({ host: '127.0.0.1', port: listenPort, path: '/health', timeout: 4000 }, res => {
+        res.resume();
+        res.statusCode === 200 ? resolve(res.statusCode) : reject(new Error('HTTP ' + res.statusCode));
+      });
+      req.on('timeout', () => req.destroy(new Error('timeout')));
+      req.on('error', reject);
+    });
+    console.log('DIAG_LOCAL_HTTP_OK status=' + local);
+  } catch (e) {
+    console.log('DIAG_LOCAL_HTTP_FAIL reason=' + String(e.message || e));
+  }
+
+  let resolved = [];
+  try {
+    resolved = await dns.lookup(publicHost, { all: true });
+    console.log('DIAG_DNS_OK host=' + publicHost + ' addresses=' + resolved.map(x => x.address + '/v' + x.family).join(','));
+  } catch (e) {
+    console.log('DIAG_DNS_FAIL host=' + publicHost + ' reason=' + String(e.code || e.message || e));
+  }
+
+  try {
+    const publicProbe = await new Promise((resolve, reject) => {
+      const req = http.get({
+        host: publicHost,
+        port: publicPort,
+        path: '/health',
+        headers: { Host: publicHost + ':' + publicPort },
+        timeout: 5000
+      }, res => {
+        res.resume();
+        res.statusCode === 200 ? resolve(res.statusCode) : reject(new Error('HTTP ' + res.statusCode));
+      });
+      req.on('timeout', () => req.destroy(new Error('timeout')));
+      req.on('error', reject);
+    });
+    console.log('DIAG_PUBLIC_HAIRPIN_OK status=' + publicProbe);
+  } catch (e) {
+    console.log('DIAG_PUBLIC_HAIRPIN_FAIL reason=' + String(e.code || e.message || e) + ' note=hairpin_may_be_blocked');
+  }
+}
+
 async function onListen() {
   refreshNodeName();
   writeOutput();
@@ -609,6 +661,7 @@ async function onListen() {
   console.log('SUB_URL ' + publicBase() + subPath);
   console.log('SUB64_URL ' + publicBase() + sub64Path);
 
+  await runStartupDiagnostics();
   await detectGeo();
   console.log('VLESS_LINK_FINAL ' + nodeUri());
 
