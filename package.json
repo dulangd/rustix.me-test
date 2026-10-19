@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "description": "Rustix.me native VLESS-over-WebSocket node with optional Railway registry integration",
-  "main": "index.js",
-  "type": "commonjs",
+  "main": "index.ts",
+  "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "check": "node --check index.js"
+    "start": "ts-node --esm index.ts",
+    "check": "node --check runtime.cjs"
   },
   "engines": {
     "node": ">=20"
