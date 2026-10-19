@@ -39,7 +39,7 @@ Preferred local secret file:
 The file must contain only the Railway registry token on one line. When present, the node registers as:
 
 - provider: `rustix`
-- stable node_id: `rustix-01`
+- stable node_id: `rustix-01-native`
 - endpoint: `POST /api/v1/register`
 - heartbeat: `POST /api/v1/heartbeat`
 
@@ -66,7 +66,7 @@ Use the repository directly:
 2. Verify `http://f1.rustix.me:37972/health`.
 3. Copy the printed VLESS link into v2rayN and verify real outbound HTTPS traffic.
 4. Restart the server and verify the same UUID/path still works.
-5. Only then add `registry_token.txt`, restart once, and confirm `REGISTRY_READY` and one Railway record `rustix-01`.
+5. Only then add `registry_token.txt`, restart once, and confirm `REGISTRY_READY` and one Railway record `rustix-01-native`.
 6. After native stability is proven, evaluate Rustix subdomain/TLS before deciding whether Cloudflare Tunnel adds value.
 7. Keep port 34822 unused until the primary endpoint is proven.
 
